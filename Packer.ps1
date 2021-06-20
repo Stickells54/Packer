@@ -106,7 +106,7 @@ param
 	[parameter(ParameterSetName = 'AdminPassword')]
 	$AdminPass,
 	$VMName,
-	[ValidateSet('HorizonIC', 'HorizonStatic', 'Standard', 'vRealizeAutomation')]
+	[ValidateSet('HorizonIC', 'HorizonStatic', 'Standard', 'Template')]
 	$DeploymentType,
 	$SnapshotName,
 	$PoolName,
@@ -119,7 +119,6 @@ param
 Import-Module -Name VMware.Hv.Helper
 Import-Module -Name VMware.VimAutomation.Core
 Import-Module -Name VMware.PowerCLI
-Import-Module -Name PowervRA
 
 if (!$AdminID)
 {
@@ -510,7 +509,7 @@ build {
 	.\packer.exe build C:\Temp\$VMName.pkr.hcl
 	
 }
-function Deploy-vRA {
+function Deploy-Template {
 	$hclFILE =
 	@"
 source "vsphere-iso" "$VMName" {
@@ -643,4 +642,12 @@ build {
 	Write-Host "               " -BackgroundColor Black
 	Read-Host -Prompt "Press enter key to exit..."
 	Exit 0
+}
+
+switch ($DeploymentType)
+{
+	HorizonIC { Deploy-HZIC }
+	HorizonStatic { Deploy-HZStatic }
+	Standard { Deploy-Standard }
+	template (Deploy-Template)
 }
