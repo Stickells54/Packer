@@ -61,7 +61,7 @@
 		HorizonIC = Take a snaphot of the VM and push to the $PoolName
 		HorizonStatic = Same as HorizonIC but it calls a differnet provisioning script that does not install the IC agent
 		Standard = Does nothing after VM creation aside from power down (normal Packer behavior)
-		vRealizeAutomation = Convert the VM into a template so it can be pushed used in a vRA blueprint. 
+		Template = Convert the VM into a template. 
 
 	.PARAMETER SnapshotName
 	What to name the snapshot that is taken and then pushed to the Horizon pool. Only used if DeploymentType is HorizonIC or HorizonStatic
@@ -85,7 +85,7 @@ param
 	[parameter(Mandatory = $true)]
 	$VMDiskMB,
 	[parameter(Mandatory = $true)]
-	$VMMemoryMBoryMB,
+	$VMMemoryMB,
 	[parameter(Mandatory = $true)]
 	$vCenterServerCluster,
 	[parameter(Mandatory = $true)]
@@ -103,16 +103,18 @@ param
 	[parameter(Mandatory = $true)]
 	$WinRMUser,
 	$AdminID,
-	[parameter(ParameterSetName = 'AdminPassword')]
 	$AdminPass,
+	[parameter(Mandatory = $true)]
 	$VMName,
+	[parameter(Mandatory = $true)]	
 	[ValidateSet('HorizonIC', 'HorizonStatic', 'Standard', 'Template')]
 	$DeploymentType,
 	$SnapshotName,
 	$PoolName,
+	[parameter(Mandatory = $true)]
 	[ValidateSet('Pro', 'Enterprise')]
 	$WinVersion = 'Enterprise',
-
+	$SkipWU
 	
 )
 
@@ -123,18 +125,21 @@ Import-Module -Name VMware.PowerCLI
 if (!$AdminID)
 {
 	$AdminID = Read-Host -Prompt "Enter your vCenter Admin ID: "
+}
+if (!$AdminPass)
+{
 	$AdminPassEncrypted = Read-Host -Prompt "Enter your vCenter Admin Password: " -AsSecureString
 	$str = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AdminPassEncrypted)
 	$AdminPass = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($str)
-	
 }
+
 
 function Deploy-HZIC {
 	$hclFILE =
 	@"
 source "vsphere-iso" "$VMName" {
   CPUs                 = "$VMCPU"
-  RAM                  = "$VMMemoryMBoryMB"
+  RAM                  = "$VMMemoryMB"
   RAM_reserve_all      = false
   video_ram			   = 128000
   cluster              = "$vCenterServerCluster"
@@ -280,7 +285,7 @@ function Deploy-HZStatic{
 	@"
 source "vsphere-iso" "$VMName" {
   CPUs                 = "$VMCPU"
-  RAM                  = "$VMMemoryMBoryMB"
+  RAM                  = "$VMMemoryMB"
   RAM_reserve_all      = false
   video_ram			   = 128000
   cluster              = "$vCenterServerCluster"
@@ -422,11 +427,13 @@ build {
 	Exit 0
 }
 function Deploy-Standard{
-	$hclFILE =
-	@"
+	if ($SkipWU -eq $false)
+	{
+		$hclFILE =
+		@"
 source "vsphere-iso" "$VMName" {
   CPUs                 = "$VMCPU"
-  RAM                  = "$VMMemoryMBoryMB"
+  RAM                  = "$VMMemoryMB"
   RAM_reserve_all      = false
   video_ram			   = 128000
   cluster              = "$vCenterServerCluster"
@@ -502,6 +509,61 @@ build {
 
 }
 "@
+	}
+	if ($SkipWU -eq $true)
+	{
+			$hclFILE =
+			@"
+source "vsphere-iso" "$VMName" {
+  CPUs                 = "$VMCPU"
+  RAM                  = "$VMMemoryMB"
+  RAM_reserve_all      = false
+  video_ram			   = 128000
+  cluster              = "$vCenterServerCluster"
+  communicator         = "winrm"
+  create_snapshot      = "false"
+  datacenter           = "$vCenterServerDataCenter"
+  datastore            = "$VMDataStore"
+  disk_controller_type = ["pvscsi"]
+  storage {
+  disk_size             = "$VMDiskMB"
+  disk_thin_provisioned = true
+  disk_controller_index = 0
+  }
+  firmware             = "efi"
+  boot_order	       = "disk,cdrom"
+  floppy_files         = ["./$WinVersion/autounattend.xml",  "./scripts/Network.ps1", "./scripts/drivers/pvscsi.cat", "./scripts/drivers/pvscsi.inf", "./scripts/drivers/pvscsi.sys", "./scripts/drivers/txtsetup.oem"]
+  folder               = "$vCenterServerFolder"
+  guest_os_type        = "windows9_64Guest"
+  insecure_connection  = "true"
+  iso_paths            = ["[$ISODatastore] $ISOPath", "[] /vmimages/tools-isoimages/windows.iso"]
+  network_adapters {
+    network      = "$VMPortGroup"
+    network_card = "vmxnet3"
+  }
+  password = "$AdminPass"
+  
+  username       = "$AdminID"
+  vcenter_server = "$vCenterServer"
+  vm_name        = "$VMName"
+  winrm_insecure = "true"
+  winrm_password = "$WinRMPAss"
+  winrm_use_ssl  = "false"
+  winrm_username = "$WinRMUser"
+  boot_command = ["<enter>"]
+  boot_wait = "3s"
+}
+
+build {
+  sources = ["source.vsphere-iso.$VMName"]
+
+  provisioner "windows-restart" {
+  }
+  
+}
+"@
+		
+	}
 	
 	$hclFILE | Out-File C:\Temp\$VMName.pkr.hcl -Encoding utf8
 	
@@ -534,7 +596,7 @@ source "vsphere-iso" "$VMName" {
   folder               = "$vCenterServerFolder"
   guest_os_type        = "windows9_64Guest"
   insecure_connection  = "true"
-  iso_paths            = ["$ISODatastore $ISOPath", "[] /vmimages/tools-isoimages/windows.iso"]
+  iso_paths            = ["[$ISODatastore] $ISOPath", "[] /vmimages/tools-isoimages/windows.iso"]
   network_adapters {
     network      = "$VMPortGroup"
     network_card = "vmxnet3"
@@ -644,10 +706,18 @@ build {
 	Exit 0
 }
 
-switch ($DeploymentType)
-{
-	HorizonIC { Deploy-HZIC }
-	HorizonStatic { Deploy-HZStatic }
-	Standard { Deploy-Standard }
-	template (Deploy-Template)
+#Execute based on DeploymentType Paramater
+switch ($DeploymentType) {
+	'HorizonIC' {
+		Deploy-HZIC
+	}
+	'HorizonStatic' {
+		Deploy-HZStatic
+	}
+	'Standard' {
+		Deploy-Standard
+	}
+	'Template' {
+		Deploy-Template
+	}
 }
