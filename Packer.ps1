@@ -106,7 +106,7 @@ param
 	$AdminPass,
 	[parameter(Mandatory = $true)]
 	$VMName,
-	[parameter(Mandatory = $true)]	
+	[parameter(Mandatory = $true)]
 	[ValidateSet('HorizonIC', 'HorizonStatic', 'Standard', 'Template')]
 	$DeploymentType,
 	$SnapshotName,
@@ -114,14 +114,15 @@ param
 	[parameter(Mandatory = $true)]
 	[ValidateSet('Pro', 'Enterprise')]
 	$WinVersion = 'Enterprise',
-	$SkipWU
+	[ValidateSet('Yes', 'No')]
+	$SkipWU = 'Yes'
 	
 )
 
-Import-Module -Name VMware.Hv.Helper
-Import-Module -Name VMware.VimAutomation.Core
-Import-Module -Name VMware.PowerCLI
 
+Import-Module -Name VMware.VimAutomation.Core
+
+# vCenter Cred Check
 if (!$AdminID)
 {
 	$AdminID = Read-Host -Prompt "Enter your vCenter Admin ID: "
@@ -133,10 +134,84 @@ if (!$AdminPass)
 	$AdminPass = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($str)
 }
 
+# Define Scipt Functions
+function Deploy-HZIC
+{
+	Import-Module -Name VMware.Hv.Helper
+	switch ($SkipWU)
+	{
+		'Yes' {
+			$hclFILE =
+			@"
+source "vsphere-iso" "$VMName" {
+  CPUs                 = "$VMCPU"
+  RAM                  = "$VMMemoryMB"
+  RAM_reserve_all      = false
+  video_ram			   = 128000
+  cluster              = "$vCenterServerCluster"
+  communicator         = "winrm"
+  create_snapshot      = "false"
+  datacenter           = "$vCenterServerDataCenter"
+  datastore            = "$VMDataStore"
+  disk_controller_type = ["pvscsi"]
+  storage {
+  disk_size             = "$VMDiskMB"
+  disk_thin_provisioned = true
+  disk_controller_index = 0
+  }
+  firmware             = "efi"
+  boot_order	       = "disk,cdrom"
+  floppy_files         = ["./$WinVersion/autounattend.xml",  "./scripts/Network.ps1", "./scripts/drivers/pvscsi.cat", "./scripts/drivers/pvscsi.inf", "./scripts/drivers/pvscsi.sys", "./scripts/drivers/txtsetup.oem"]
+  folder               = "$vCenterServerFolder"
+  guest_os_type        = "windows9_64Guest"
+  insecure_connection  = "true"
+  iso_paths            = ["[$ISODatastore] $ISOPath", "[] /vmimages/tools-isoimages/windows.iso"]
+  network_adapters {
+    network      = "$VMPortGroup"
+    network_card = "vmxnet3"
+  }
+  password = "$AdminPass"
+  
+  username       = "$AdminID"
+  vcenter_server = "$vCenterServer"
+  vm_name        = "$VMName"
+  winrm_insecure = "true"
+  winrm_password = "$WinRMPAss"
+  winrm_use_ssl  = "false"
+  winrm_username = "$WinRMUser"
+  boot_command = ["<enter>"]
+  boot_wait = "3s"
+}
 
-function Deploy-HZIC {
-	$hclFILE =
-	@"
+build {
+  sources = ["source.vsphere-iso.$VMName"]
+
+  provisioner "windows-restart" {
+  }
+  
+  provisioner "powershell"{
+  	elevated_user = "$WinRMUser"
+	elevated_password = "$WinRMPAss"
+	scripts = ["./scripts/TeamsInstall.ps1"]
+  }
+
+  provisioner "windows-restart" {
+  }
+
+  provisioner "powershell"{
+  	elevated_user = "$WinRMUser"
+	elevated_password = "$WinRMPAss"
+	scripts = ["./scripts/ImageSetup.ps1"]
+  }
+
+  provisioner "windows-restart" {
+  }  
+}
+"@
+		}
+		'No' {
+			$hclFILE =
+			@"
 source "vsphere-iso" "$VMName" {
   CPUs                 = "$VMCPU"
   RAM                  = "$VMMemoryMB"
@@ -233,6 +308,9 @@ build {
   }  
 }
 "@
+		}
+		
+	}
 	
 	$hclFILE | Out-File C:\Temp\$VMName.pkr.hcl -Encoding utf8
 	
@@ -280,9 +358,83 @@ build {
 	Read-Host -Prompt "Press enter key to exit..."
 	Exit 0
 }
-function Deploy-HZStatic{
-	$hclFILE =
-	@"
+function Deploy-HZStatic
+{
+	Import-Module -Name VMware.Hv.Helper
+	switch ($SkipWU)
+	{
+		'Yes' {
+			$hclFILE =
+			@"
+source "vsphere-iso" "$VMName" {
+  CPUs                 = "$VMCPU"
+  RAM                  = "$VMMemoryMB"
+  RAM_reserve_all      = false
+  video_ram			   = 128000
+  cluster              = "$vCenterServerCluster"
+  communicator         = "winrm"
+  create_snapshot      = "false"
+  datacenter           = "$vCenterServerDataCenter"
+  datastore            = "$VMDataStore"
+  disk_controller_type = ["pvscsi"]
+  storage {
+  disk_size             = "$VMDiskMB"
+  disk_thin_provisioned = true
+  disk_controller_index = 0
+  }
+  firmware             = "efi"
+  boot_order	       = "disk,cdrom"
+  floppy_files         = ["./$WinVersion/autounattend.xml",  "./scripts/Network.ps1", "./scripts/drivers/pvscsi.cat", "./scripts/drivers/pvscsi.inf", "./scripts/drivers/pvscsi.sys", "./scripts/drivers/txtsetup.oem"]
+  folder               = "$vCenterServerFolder"
+  guest_os_type        = "windows9_64Guest"
+  insecure_connection  = "true"
+  iso_paths            = ["[$ISODatastore] $ISOPath", "[] /vmimages/tools-isoimages/windows.iso"]
+  network_adapters {
+    network      = "$VMPortGroup"
+    network_card = "vmxnet3"
+  }
+  password = "$AdminPass"
+  
+  username       = "$AdminID"
+  vcenter_server = "$vCenterServer"
+  vm_name        = "$VMName"
+  winrm_insecure = "true"
+  winrm_password = "$WinRMPAss"
+  winrm_use_ssl  = "false"
+  winrm_username = "$WinRMUser"
+  boot_command = ["<enter>"]
+  boot_wait = "3s"
+}
+
+build {
+  sources = ["source.vsphere-iso.$VMName"]
+
+  provisioner "windows-restart" {
+  }
+
+  provisioner "powershell"{
+  	elevated_user = "$WinRMUser"
+	elevated_password = "$WinRMPAss"
+	scripts = ["./scripts/TeamsInstall.ps1"]
+  }
+
+  provisioner "windows-restart" {
+  }
+
+  provisioner "powershell"{
+  	elevated_user = "$WinRMUser"
+	elevated_password = "$WinRMPAss"
+	scripts = ["./scripts/ImageSetup_Static.ps1"]
+  }
+
+  provisioner "windows-restart" {
+  }  
+}
+"@
+		}
+		'No' {
+			$hclFILE =
+			@"
 source "vsphere-iso" "$VMName" {
   CPUs                 = "$VMCPU"
   RAM                  = "$VMMemoryMB"
@@ -379,6 +531,9 @@ build {
   }  
 }
 "@
+		}
+		
+	}
 	
 	$hclFILE | Out-File C:\Temp\$VMName.pkr.hcl -Encoding utf8
 	
@@ -426,11 +581,65 @@ build {
 	Read-Host -Prompt "Press enter key to exit..."
 	Exit 0
 }
-function Deploy-Standard{
-	if ($SkipWU -eq $false)
+function Deploy-Standard
+{
+	switch ($SkipWU)
 	{
-		$hclFILE =
-		@"
+		'Yes' {
+			$hclFILE =
+			@"
+source "vsphere-iso" "$VMName" {
+  CPUs                 = "$VMCPU"
+  RAM                  = "$VMMemoryMB"
+  RAM_reserve_all      = false
+  video_ram			   = 128000
+  cluster              = "$vCenterServerCluster"
+  communicator         = "winrm"
+  create_snapshot      = "false"
+  datacenter           = "$vCenterServerDataCenter"
+  datastore            = "$VMDataStore"
+  disk_controller_type = ["pvscsi"]
+  storage {
+  disk_size             = "$VMDiskMB"
+  disk_thin_provisioned = true
+  disk_controller_index = 0
+  }
+  firmware             = "efi"
+  boot_order	       = "disk,cdrom"
+  floppy_files         = ["./$WinVersion/autounattend.xml",  "./scripts/Network.ps1", "./scripts/drivers/pvscsi.cat", "./scripts/drivers/pvscsi.inf", "./scripts/drivers/pvscsi.sys", "./scripts/drivers/txtsetup.oem"]
+  folder               = "$vCenterServerFolder"
+  guest_os_type        = "windows9_64Guest"
+  insecure_connection  = "true"
+  iso_paths            = ["[$ISODatastore] $ISOPath", "[] /vmimages/tools-isoimages/windows.iso"]
+  network_adapters {
+    network      = "$VMPortGroup"
+    network_card = "vmxnet3"
+  }
+  password = "$AdminPass"
+  
+  username       = "$AdminID"
+  vcenter_server = "$vCenterServer"
+  vm_name        = "$VMName"
+  winrm_insecure = "true"
+  winrm_password = "$WinRMPAss"
+  winrm_use_ssl  = "false"
+  winrm_username = "$WinRMUser"
+  boot_command = ["<enter>"]
+  boot_wait = "3s"
+}
+
+build {
+  sources = ["source.vsphere-iso.$VMName"]
+
+  provisioner "windows-restart" {
+  }
+  
+}
+"@
+		}
+		'No' {
+			$hclFILE =
+			@"
 source "vsphere-iso" "$VMName" {
   CPUs                 = "$VMCPU"
   RAM                  = "$VMMemoryMB"
@@ -509,9 +718,20 @@ build {
 
 }
 "@
+			
+		}
 	}
-	if ($SkipWU -eq $true)
+	$hclFILE | Out-File C:\Temp\$VMName.pkr.hcl -Encoding utf8
+	
+	CD C:\Packer
+	.\packer.exe build C:\Temp\$VMName.pkr.hcl
+	
+}
+function Deploy-Template
+{
+	switch ($SkipWU)
 	{
+		'Yes' {
 			$hclFILE =
 			@"
 source "vsphere-iso" "$VMName" {
@@ -559,21 +779,39 @@ build {
 
   provisioner "windows-restart" {
   }
-  
+
+  provisioner "powershell"{
+  	elevated_user = "$WinRMUser"
+	elevated_password = "$WinRMPAss"
+	inline = ["New-Item -Path C:\\Temp -ItemType Directory -Force"]
+  }
+
+  provisioner "file"{
+  	source = "./scripts/vRA"
+	destination = "C:\\Temp"
+  }
+
+  provisioner "powershell"{
+  	elevated_user = "$WinRMUser"
+	elevated_password = "$WinRMPAss"
+	inline = ["C:\\Temp\\vRA\\prepare_vra_template.ps1"]
+  }
+
+  provisioner "windows-restart" {
+  }
+
+  provisioner "powershell"{
+  	elevated_user = "$WinRMUser"
+	elevated_password = "$WinRMPAss"
+	script = "./scripts/vRASetup.ps1"
+  }
+
 }
 "@
-		
-	}
-	
-	$hclFILE | Out-File C:\Temp\$VMName.pkr.hcl -Encoding utf8
-	
-	CD C:\Packer
-	.\packer.exe build C:\Temp\$VMName.pkr.hcl
-	
-}
-function Deploy-Template {
-	$hclFILE =
-	@"
+		}
+		'No' {
+			$hclFILE =
+			@"
 source "vsphere-iso" "$VMName" {
   CPUs                 = "$VMCPU"
   RAM                  = "$VMMemoryMB"
@@ -678,10 +916,13 @@ build {
 
 }
 "@
+		}
+		
+	}
 	
 	$hclFILE | Out-File C:\Temp\$VMName.pkr.hcl -Encoding utf8
 	
-	CD C:\Packer
+	CD $PSScriptRoot
 	.\packer.exe build C:\Temp\$VMName.pkr.hcl
 	
 	Write-Host "Setting Display settings on VM..."
@@ -699,15 +940,16 @@ build {
 	Write-Host "Converting to Template..." -ForegroundColor Green -BackgroundColor Black
 	Get-VM -Name $VMName | Set-VM -ToTemplate -Confirm:$false
 	Write-Host "Template Created!" -ForegroundColor Green -BackgroundColor Black
-	Start-Sleep 2	
+	Start-Sleep 2
 	Write-Host "Image created and a converted to a template." -ForegroundColor Green -BackgroundColor Black
 	Write-Host "               " -BackgroundColor Black
 	Read-Host -Prompt "Press enter key to exit..."
 	Exit 0
 }
 
-#Execute based on DeploymentType Paramater
-switch ($DeploymentType) {
+# Execute based on DeploymentType Paramater
+switch ($DeploymentType)
+{
 	'HorizonIC' {
 		Deploy-HZIC
 	}
