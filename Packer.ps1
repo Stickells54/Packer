@@ -66,6 +66,9 @@
 	.PARAMETER SnapshotName
 	What to name the snapshot that is taken and then pushed to the Horizon pool. Only used if DeploymentType is HorizonIC or HorizonStatic
 
+	.PARAMETER HVSERVER
+	The Horizon URL that is used to connect to and push the image to a pool.
+
 	.PARAMETER PoolName
 	Name of the Horizon Pool to push the image to. Only used if DeploymentType is HorizonIC or HorizonStatic
 
@@ -115,7 +118,8 @@ param
 	[ValidateSet('Pro', 'Enterprise')]
 	$WinVersion = 'Enterprise',
 	[ValidateSet('Yes', 'No')]
-	$SkipWU = 'Yes'
+	$SkipWU = 'Yes',
+	$HVServer
 	
 )
 
@@ -337,7 +341,6 @@ build {
 	New-Snapshot -VM $VMName -Name "$SnapshotName" -Description "Snapshot created during inital build of VM via Packer\PowerCLI" | Out-Null
 	
 	#Push to a Horizon Pool
-	$HVServer = "webvdi.usps.gov"
 	Write-Host "Connecting to Horizon..." -ForegroundColor Green -BackgroundColor Black
 	Connect-HVServer -Server $HVServer -Username $AdminID -Password $AdminPass -Domain $env:USERDOMAIN | Out-Null
 	Write-Host "Pushing $VMName/$SnapshotName to $PoolName" -ForegroundColor Green -BackgroundColor Black
@@ -560,7 +563,6 @@ build {
 	New-Snapshot -VM $VMName -Name "$SnapshotName" -Description "Snapshot created during inital build of VM via Packer\PowerCLI" | Out-Null
 	
 	#Push to a Horizon Pool
-	$HVServer = "webvdi.usps.gov"
 	Write-Host "Connecting to Horizon..." -ForegroundColor Green -BackgroundColor Black
 	Connect-HVServer -Server $HVServer -Username $AdminID -Password $AdminPass -Domain $env:USERDOMAIN | Out-Null
 	Write-Host "Pushing $VMName/$SnapshotName to $PoolName" -ForegroundColor Green -BackgroundColor Black
