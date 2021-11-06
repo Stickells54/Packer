@@ -10,7 +10,7 @@ Change the hashtable in DeployPacker.ps1 to fit your needs. Place the files and 
 You will need to make sure you change the provisioning sections of the HCL files to match your provisioning scripts.
 Also, you could replace the powershell provisioners with Ansible, Chef, etc. 
 
-# Paramaters
+# Parameters
 A list of parameters available in Packer.ps1. This list is also in the file itself. 
 
 > ISODatastore
