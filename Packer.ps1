@@ -115,7 +115,7 @@ param
 	$SnapshotName,
 	$PoolName,
 	[parameter(Mandatory = $true)]
-	[ValidateSet('Pro', 'Enterprise')]
+	[ValidateSet('Pro', 'Enterprise', '21h2', '1122h2')]
 	$WinVersion = 'Enterprise',
 	[ValidateSet('Yes', 'No')]
 	$SkipWU = 'Yes',
