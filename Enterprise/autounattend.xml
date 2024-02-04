@@ -83,11 +83,11 @@
             </ImageInstall>
             <UserData>
                 <ProductKey>
-                    <Key>NPPR9-FWDCX-D2C8J-H872K-2YT43</Key>
+                    <Key></Key>
                 </ProductKey>
                 <AcceptEula>true</AcceptEula>
                 <FullName></FullName>
-                <Organization>USPS</Organization>
+                <Organization></Organization>
             </UserData>
         </component>
     </settings>
@@ -110,7 +110,7 @@
                 <LocalAccounts>
                     <LocalAccount wcm:action="add">
                         <Password>
-                            <Value>VgBNAHcAYQByAGUAMQAhAFAAYQBzAHMAdwBvAHIAZAA=</Value>
+                            <Value></Value>
                             <PlainText>false</PlainText>
                         </Password>
                         <DisplayName>Admin</DisplayName>
