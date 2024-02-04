@@ -89,11 +89,11 @@
             </ImageInstall>
             <UserData>
                 <ProductKey>
-                    <Key>W269N-WFGWX-YVC9B-4J6C9-T83GX</Key>
+                    <Key></Key>
                 </ProductKey>
                 <AcceptEula>true</AcceptEula>
                 <FullName></FullName>
-                <Organization>USPS</Organization>
+                <Organization></Organization>
             </UserData>
         </component>
     </settings>
@@ -116,7 +116,7 @@
                 <LocalAccounts>
                     <LocalAccount wcm:action="add">
                         <Password>
-                            <Value>VgBNAHcAYQByAGUAMQAhAFAAYQBzAHMAdwBvAHIAZAA=</Value>
+                            <Value></Value>
                             <PlainText>false</PlainText>
                         </Password>
                         <DisplayName>Admin</DisplayName>
